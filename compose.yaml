@@ -1,0 +1,43 @@
+name: cms-event-service
+x-api: &api
+  build: .
+  environment: &environment
+    ConnectionStrings__Writer: "Host=db;Database=cms;Username=cms;Password=${POSTGRES_PASSWORD:?Run scripts/setup.py first}"
+    Auth__Cms__Username: ${Auth__Cms__Username:?Run scripts/setup.py first}
+    Auth__Cms__Password: ${Auth__Cms__Password:?Run scripts/setup.py first}
+    Auth__Consumer__Username: ${Auth__Consumer__Username:?Run scripts/setup.py first}
+    Auth__Consumer__Password: ${Auth__Consumer__Password:?Run scripts/setup.py first}
+    Auth__Admin__Username: ${Auth__Admin__Username:?Run scripts/setup.py first}
+    Auth__Admin__Password: ${Auth__Admin__Password:?Run scripts/setup.py first}
+    ASPNETCORE_HTTP_PORTS: 8080
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: cms
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup.py first}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cms -d cms"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    <<: *api
+    command: ["--migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    <<: *api
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  postgres-data:
